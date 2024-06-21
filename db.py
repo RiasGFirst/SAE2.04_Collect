@@ -1,44 +1,65 @@
 import mysql.connector
+from mysql.connector import errorcode
 from dotenv import load_dotenv
 import os
 
 
-def insert_data(maison, piece, id_capteur, dateday, heure, temp):
-
+def ensure_capteur_exists(maison, piece, id_capteur):
     load_dotenv()
+    db_config = {
+        "host": os.getenv("HOST"),
+        "user": os.getenv("USER"),
+        "password": os.getenv("PASSWORD"),
+        "database": os.getenv("DATABASE"),
+    }
+    cnx = mysql.connector.connect(**db_config)
+    cursor = cnx.cursor()
+    # Check if the capteur already exists
+    cursor.execute("SELECT id FROM CAPTEUR WHERE id_capteur = %s", (id_capteur,))
+    result = cursor.fetchone()
+    print(result)
+    if result is None:
+        # Insert new capteur
+        insert_capteur_query = """
+        INSERT INTO CAPTEUR (maison, piece, id_capteur)
+        VALUES (%s, %s, %s)
+        """
+        cursor.execute(insert_capteur_query, (maison, piece, id_capteur))
+        cnx.commit()
+        print(f"Inserted new capteur: {maison}, {piece}, {id_capteur}")
 
-    HOST = os.getenv("HOST")
-    USER = os.getenv("USER")
-    PASSWORD = os.getenv("PASSWORD")
-    DATABASE = os.getenv("DATABASE")
+        # retrieve the id of the newly inserted capteur
+        cursor.execute("SELECT id FROM CAPTEUR WHERE id_capteur = %s", (id_capteur,))
+        result = cursor.fetchone()
+        print(result[0])
+        # return the id of the newly inserted capteur
+        return result[0]
+    else:
+        print(f"Capteur already exists: {id_capteur}")
+    cnx.commit()
+    cursor.close()
+    cnx.close()
+    return result[0]
 
-    try:
-        conn = mysql.connector.connect(
-            host=HOST,
-            user=USER,
-            password=PASSWORD,
-            database=DATABASE
-        )
 
-        cursor = conn.cursor()
+def insert_into_db(id_capteur, date, time, temperature):
+    load_dotenv()
+    db_config = {
+        "host": os.getenv("HOST"),
+        "user": os.getenv("USER"),
+        "password": os.getenv("PASSWORD"),
+        "database": os.getenv("DATABASE"),
+    }
+    cnx = mysql.connector.connect(**db_config)
+    cursor = cnx.cursor()
 
-        print(f"Insertion des données dans la base de données {DATABASE}...")
+    insert_donnees_query = """
+           INSERT INTO DONNEE (date, heure, temperature, id_capteur_id)
+           VALUES (%s, %s, %s, %s)
+           """
+    cursor.execute(insert_donnees_query, (date, time, temperature, id_capteur))
+    cnx.commit()
+    cursor.close()
+    cnx.close()
+    print(f"Inserted new data: {id_capteur}, {date}, {time}, {temperature}")
 
-        cursor.execute('''
-        INSERT INTO CAPTEUR (maison, piece, id_capteur) VALUES (%s, %s, %s)
-        ON DUPLICATE KEY UPDATE maison=VALUES(maison), piece=VALUES(piece)
-        ''', (maison, piece, id_capteur))
-
-        cursor.execute('''
-        INSERT INTO DONNEES (dateday, heure, temp, capteur) VALUES (%s, %s, %s, %s)
-        ''', (dateday, heure, temp, id_capteur))
-
-        conn.commit()
-
-    except mysql.connector.Error as err:
-        print(err)
-    finally:
-        if conn.is_connected():
-            cursor.close()
-            conn.close()
-            print("Connexion à la base de données fermée.")

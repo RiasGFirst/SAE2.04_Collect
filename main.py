@@ -35,7 +35,8 @@ def on_message(client, userdata, message):
     print(f"Date: {date}")
     print(f"Heure: {time}")
     print(f"Température: {temp}")
-    db.insert_data(maison, piece, id, date, time, temp)
+    id_capteur = db.ensure_capteur_exists(maison, piece, id)
+    db.insert_into_db(id_capteur, date, time, temp)
     print("")
 
 
